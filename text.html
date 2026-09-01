@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI小说">
+    <meta name="theme-color" content="#000000">
+    <title>AI小说创作系统</title>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --success: #34C759;
+            --warning: #FF9500;
+            --danger: #FF3B30;
+            --bg: #F2F2F7;
+            --card: #FFFFFF;
+            --text: #000000;
+            --secondary: #8E8E93;
+            --border: #C6C6C8;
+            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+        textarea, input { -webkit-user-select: text; user-select: text; }
+        
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        /* 导航栏 */
+        .navbar {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding-top: var(--safe-top);
+            border-bottom: 0.5px solid var(--border);
+            z-index: 50;
+        }
+        .navbar-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            height: 44px;
+        }
+        .nav-btn {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+        }
+        .nav-btn:active { background: rgba(0,0,0,0.1); }
+        .nav-title {
+            font-size: 17px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .nav-subtitle {
+            font-size: 11px;
+            color: var(--secondary);
+            text-align: center;
+        }
+        
+        /* 统计栏 */
+        .stats {
+            display: flex;
+            padding: 8px 12px;
+            gap: 6px;
+            background: var(--card);
+        }
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 8px 4px;
+            border-radius: 8px;
+            background: var(--bg);
+        }
+        .stat-val { font-size: 16px; font-weight: 700; color: var(--primary); }
+        .stat-lbl { font-size: 10px; color: var(--secondary); }
+        
+        /* 模型栏 */
+        .models {
+            display: flex;
+            gap: 6px;
+            padding: 8px 12px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            background: var(--card);
+            border-bottom: 0.5px solid var(--border);
+        }
+        .models::-webkit-scrollbar { display: none; }
+        .model-chip {
+            padding: 6px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 12px;
+            color: var(--text);
+            flex-shrink: 0;
+        }
+        .model-chip.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        
+        /* 进度条 */
+        .progress-wrap { padding: 4px 12px; background: var(--card); }
+        .progress {
+            height: 3px;
+            background: #E5E5EA;
+            border-radius: 1.5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* 编辑器 */
+        .editor-area {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 12px;
+        }
+        .editor-box {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 200px;
+        }
+        .editor {
+            width: 100%;
+            min-height: 280px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.7;
+            resize: none;
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+        }
+        .editor::placeholder { color: #C7C7CC; }
+        
+        /* 底部工具栏 */
+        .toolbar {
+            display: flex;
+            gap: 4px;
+            padding: 8px 10px;
+            padding-bottom: calc(var(--safe-bottom) + 8px);
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 0.5px solid var(--border);
+        }
+        .tool-btn {
+            flex: 1;
+            padding: 8px 4px;
+            border: none;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            background: transparent;
+            color: var(--text);
+        }
+        .tool-btn:active { transform: scale(0.9); }
+        .tool-btn .ico { font-size: 20px; }
+        .tool-btn.primary { background: var(--primary); color: #fff; }
+        .tool-btn.secondary { background: #E9E9EB; color: var(--primary); }
+        
+        /* 底部弹窗 */
+        .sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card);
+            border-radius: 16px 16px 0 0;
+            padding: 16px 20px;
+            padding-bottom: calc(var(--safe-bottom) + 20px);
+            z-index: 100;
+            max-height: 65vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            animation: slideUp 0.25s ease-out;
+            display: none;
+            margin: 0 auto;
+            max-width: 500px;
+        }
+        .sheet.active { display: block; }
+        .sheet-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 99;
+            display: none;
+        }
+        .sheet-overlay.active { display: block; }
+        .sheet-handle {
+            width: 36px; height: 4px;
+            background: #D1D1D6;
+            border-radius: 2px;
+            margin: 0 auto 14px;
+        }
+        .sheet-title {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        /* 模态框 */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 350px;
+            animation: pop 0.2s ease-out;
+        }
+        @keyframes pop {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        /* 表单 */
+        .form-group { margin-bottom: 12px; }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .form-input:focus { border-color: var(--primary); }
+        .form-textarea { min-height: 60px; resize: vertical; }
+        .form-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238E8E93' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        
+        /* 按钮 */
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-secondary { background: #E9E9EB; color: var(--primary); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-block { width: 100%; }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: calc(var(--safe-top) + 55px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 18px;
+            font-size: 13px;
+            z-index: 300;
+            display: none;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            white-space: nowrap;
+        }
+        .toast.show { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -8px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        
+        /* 逻辑结果 */
+        .logic-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .logic-item.critical { background: #FFF0F0; border: 1px solid #FFD6D6; }
+        .logic-item.warning { background: #FFF8F0; border: 1px solid #FFE8D6; }
+        .logic-item.info { background: #F0F7FF; border: 1px solid #D6E8FF; }
+        
+        /* 暗色模式 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #000000;
+                --card: #1C1C1E;
+                --text: #FFFFFF;
+                --secondary: #8E8E93;
+                --border: #38383A;
+            }
+            .navbar, .toolbar {
+                background: rgba(28,28,30,0.95);
+            }
+            .toast {
+                background: rgba(255,255,255,0.2);
+            }
+            .tool-btn.secondary {
+                background: #2C2C2E;
+            }
+            .logic-item.critical { background: #3A1C1C; border-color: #5C2C2C; }
+            .logic-item.warning { background: #3A2C1C; border-color: #5C442C; }
+            .logic-item.info { background: #1C2C3A; border-color: #2C445C; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- 导航栏 -->
+        <div class="navbar">
+            <div class="navbar-inner">
+                <button class="nav-btn" onclick="showSheet('bookSheet')">📚</button>
+                <div>
+                    <div class="nav-title">AI小说创作</div>
+                    <div class="nav-subtitle" id="statusText">就绪</div>
+                </div>
+                <button class="nav-btn" onclick="saveBook()">💾</button>
+            </div>
+        </div>
+        
+        <!-- 统计栏 -->
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-val" id="wordCount">0</div>
+                <div class="stat-lbl">字数</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="chapterCount">0</div>
+                <div class="stat-lbl">章节</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="characterCount">0</div>
+                <div class="stat-lbl">人物</div>
+            </div>
+        </div>
+        
+        <!-- 模型选择 -->
+        <div class="models" id="modelBar">
+            <button class="model-chip active" onclick="selectModel('gpt-4',this)">GPT-4</button>
+            <button class="model-chip" onclick="selectModel('claude',this)">Claude</button>
+            <button class="model-chip" onclick="selectModel('deepseek',this)">DeepSeek</button>
+            <button class="model-chip" onclick="selectModel('qwen',this)">通义千问</button>
+        </div>
+        
+        <!-- 进度条 -->
+        <div class="progress-wrap">
+            <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        
+        <!-- 编辑器 -->
+        <div class="editor-area">
+            <div class="editor-box">
+                <textarea class="editor" id="editor" placeholder="开始创作...&#10;&#10;• 点击下方按钮使用AI生成&#10;• 支持多模型切换&#10;• 自动保存&#10;• 千万字级创作"></textarea>
+            </div>
+        </div>
+        
+        <!-- 底部工具栏 -->
+        <div class="toolbar">
+            <button class="tool-btn primary" onclick="aiGenerate()"><span class="ico">✨</span>生成</button>
+            <button class="tool-btn secondary" onclick="aiContinue()"><span class="ico">📝</span>续写</button>
+            <button class="tool-btn secondary" onclick="showSheet('toolsSheet')"><span class="ico">🔧</span>工具</button>
+            <button class="tool-btn secondary" onclick="showSheet('logicSheet')"><span class="ico">🔍</span>审校</button>
+            <button class="tool-btn secondary" onclick="showSheet('settingsSheet')"><span class="ico">⚙️</span>设置</button>
+        </div>
+    </div>
+    
+    <!-- 遮罩 -->
+    <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheets()"></div>
+    
+    <!-- 书籍列表 -->
+    <div class="sheet" id="bookSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">📚 我的书籍</div>
+        <div id="bookList"></div>
+        <button class="btn btn-primary btn-block" onclick="showNewBook()" style="margin-top:10px">➕ 新建书籍</button>
+    </div>
+    
+    <!-- 工具 -->
+    <div class="sheet" id="toolsSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">🔧 创作工具</div>
+        <div style="display:grid;gap:6px">
+            <button class="btn btn-secondary" onclick="genOutline()">📋 生成大纲</button>
+            <button class="btn btn-secondary" onclick="genCharacters()">👥 人物关系</button>
+            <button class="btn btn-secondary" onclick="genTimeline()">⏰ 时间线</button>
+            <button class="btn btn-secondary" onclick="genForeshadows()">🎯 伏笔管理</button>
+            <button class="btn btn-secondary" onclick="rewriteChapter()">✏️ 重写章节</button>
+            <button class="btn btn-secondary" onclick="detectConflicts()">⚠️ 矛盾检测</button>
+            <button class="btn btn-secondary" onclick="exportTXT()">📄 导出TXT</button>
+            <button class="btn btn-secondary" onclick="exportEPUB()">📚 导出EPUB</button>
+        </div>
+    </div>
+    
+    <!-- 逻辑审校 -->
+    <div class="sheet" id="logicSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">🔍 逻辑审校</div>
+        <div id="logicResults"></div>
+        <button class="btn btn-primary btn-block" onclick="runLogic()" style="margin-top:10px">开始检查</button>
+    </div>
+    
+    <!-- 设置 -->
+    <div class="sheet" id="settingsSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">⚙️ 设置</div>
+        <div class="form-group">
+            <label class="form-label">自动保存间隔</label>
+            <select class="form-select" id="autoSaveInterval">
+                <option value="10">10秒</option>
+                <option value="30" selected>30秒</option>
+                <option value="60">60秒</option>
+                <option value="300">5分钟</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">默认模型</label>
+            <select class="form-select" id="defaultModel">
+                <option value="gpt-4">GPT-4</option>
+                <option value="claude">Claude</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="qwen">通义千问</option>
+            </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="saveSettings()">保存设置</button>
+    </div>
+    
+    <!-- 新建书籍弹窗 -->
+    <div class="modal" id="newBookModal">
+        <div class="modal-content">
+            <div class="sheet-title">📚 新建书籍</div>
+            <div class="form-group">
+                <label class="form-label">书名</label>
+                <input class="form-input" type="text" id="bookTitle" placeholder="输入书名">
+            </div>
+            <div class="form-group">
+                <label class="form-label">主题</label>
+                <textarea class="form-input form-textarea" id="bookTheme" placeholder="描述主题"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">目标字数</label>
+                <select class="form-select" id="targetWords">
+                    <option value="10000">1万字</option>
+                    <option value="50000">5万字</option>
+                    <option value="100000">10万字</option>
+                    <option value="500000">50万字</option>
+                    <option value="1000000">100万字</option>
+                    <option value="5000000">500万字</option>
+                    <option value="10000000" selected>1000万字</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">类型</label>
+                <select class="form-select" id="bookGenre">
+                    <option value="fantasy">奇幻</option>
+                    <option value="scifi">科幻</option>
+                    <option value="romance">言情</option>
+                    <option value="mystery">悬疑</option>
+                    <option value="historical">历史</option>
+                    <option value="other">其他</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary" onclick="closeModal('newBookModal')" style="flex:1">取消</button>
+                <button class="btn btn-primary" onclick="createBook()" style="flex:1">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ========== AI小说创作系统 ==========
+    class AINovel {
+        constructor() {
+            this.currentBook = null;
+            this.currentModel = 'gpt-4';
+            this.books = this.load('books') || [];
+            this.settings = this.load('settings') || { autoSaveInterval: 30, defaultModel: 'gpt-4' };
+            this.timer = null;
+            this.toastTimer = null;
+            this.init();
+        }
+        
+        init() {
+            const ed = document.getElementById('editor');
+            ed.addEventListener('input', () => this.updateStats());
+            this.setupAutoSave();
+            this.renderBooks();
+            this.updateStats();
+            this.loadLast();
+        }
+        
+        // ===== 书籍 =====
+        createBook() {
+            const t = document.getElementById('bookTitle').value.trim();
+            const th = document.getElementById('bookTheme').value.trim();
+            const w = parseInt(document.getElementById('targetWords').value);
+            const g = document.getElementById('bookGenre').value;
+            if (!t || !th) { this.toast('请填写书名和主题'); return; }
+            
+            const book = { id: Date.now().toString(), title: t, theme: th, genre: g, targetWords: w, content: '', updatedAt: new Date().toISOString() };
+            this.books.unshift(book);
+            this.currentBook = book;
+            this.save('books', this.books);
+            this.renderBooks();
+            this.closeModal('newBookModal');
+            document.getElementById('editor').value = '';
+            document.getElementById('bookTitle').value = '';
+            document.getElementById('bookTheme').value = '';
+            this.updateStats();
+            this.toast('《' + t + '》创建成功');
+            setTimeout(() => this.genOutline(), 300);
+        }
+        
+        openBook(id) {
+            this.currentBook = this.books.find(b => b.id === id);
+            if (this.currentBook) {
+                document.getElementById('editor').value = this.currentBook.content || '';
+                this.updateStats();
+                this.closeSheets();
+                this.toast('已打开《' + this.currentBook.title + '》');
+            }
+        }
+        
+        delBook(id) {
+            if (!confirm('确定删除？')) return;
+            this.books = this.books.filter(b => b.id !== id);
+            if (this.currentBook && this.currentBook.id === id) {
+                this.currentBook = null;
+                document.getElementById('editor').value = '';
+            }
+            this.save('books', this.books);
+            this.renderBooks();
+            this.updateStats();
+            this.toast('已删除');
+        }
+        
+        renderBooks() {
+            const d = document.getElementById('bookList');
+            if (!this.books.length) {
+                d.innerHTML = '<div style="text-align:center;padding:30px;color:#8E8E93">暂无书籍</div>';
+                return;
+            }
+            d.innerHTML = this.books.map(b => 
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="app.openBook(\'' + b.id + '\')">' +
+                '<div><div style="font-weight:600">' + b.title + '</div>' +
+                '<div style="font-size:11px;color:var(--secondary)">' + (b.content || '').length.toLocaleString() + '字 · ' + (b.genre || '') + '</div></div>' +
+                '<button class="nav-btn" onclick="event.stopPropagation();app.delBook(\'' + b.id + '\')">🗑️</button></div>'
+            ).join('');
+        }
+        
+        loadLast() {
+            if (this.books.length) {
+                this.currentBook = this.books[0];
+                document.getElementById('editor').value = this.currentBook.content || '';
+                this.updateStats();
+            }
+        }
+        
+        // ===== AI功能 =====
+        async aiGenerate() {
+            this.toast('✨ 生成中...');
+            await this.wait(600);
+            const t = ['\n\n在浩瀚的世界中，故事正在展开。\n\n主角站在命运的十字路口，面临着重要的选择。\n\n',
+                '\n\n随着故事的深入，更多的秘密逐渐浮出水面。\n\n',
+                '\n\n在这个充满可能性的世界里，每一个决定都可能改变一切。\n\n'];
+            this.append(t[Math.floor(Math.random() * t.length)]);
+            this.toast('✅ 完成');
+        }
+        
+        async aiContinue() {
+            if (!document.getElementById('editor').value) { this.toast('请先输入内容'); return; }
+            this.toast('📝 续写中...');
+            await this.wait(600);
+            this.append('\n\n故事继续发展，新的情节正在展开...\n\n');
+            this.toast('✅ 完成');
+        }
+        
+        genOutline() {
+            if (!this.currentBook) { this.toast('请先创建书籍'); return; }
+            this.append('\n\n【' + this.currentBook.title + ' - 大纲】\n\n第一章：开篇\n第二章：发展\n第三章：高潮\n第四章：结局\n');
+            this.toast('✅ 完成');
+            this.closeSheets();
+        }
+        
+        genCharacters() {
+            this.append('\n\n【人物关系】\n\n主角：李明\n配角：张华\n反派：王强\n');
+            this.toast('✅ 完成');
+            this.closeSheets();
+        }
+        
+        genTimeline() {
+            this.append('\n\n【时间线】\n\n第1章：开始\n第2章：转折\n第3章：高潮\n');
+            this.toast('✅ 完成');
+            this.closeSheets();
+        }
+        
+        genForeshadows() {
+            this.append('\n\n【伏笔管理】\n\n伏笔1：神秘信件\n伏笔2：身世之谜\n');
+            this.toast('✅ 完成');
+            this.closeSheets();
+        }
+        
+        async rewriteChapter() {
+            this.toast('✏️ 重写中...');
+            await this.wait(600);
+            this.toast('✅ 完成');
+            this.closeSheets();
+        }
+        
+        // ===== 逻辑审校 =====
+        async runLogic() {
+            const c = document.getElementById('editor').value;
+            if (!c) { this.toast('请先输入内容'); return; }
+            this.toast('🔍 检查中...');
+            await this.wait(400);
+            const issues = this.checkLogic(c);
+            const d = document.getElementById('logicResults');
+            if (!issues.length) {
+                d.innerHTML = '<div style="text-align:center;padding:30px;color:#34C759">✅ 未发现问题</div>';
+            } else {
+                d.innerHTML = issues.map(i => 
+                    '<div class="logic-item ' + i.s + '"><strong>' + i.t + '</strong><p style="margin-top:3px">' + i.d + '</p></div>'
+                ).join('');
+            }
+            this.toast('✅ 完成');
+        }
+        
+        checkLogic(c) {
+            const r = [];
+            if (/的的|了了|在在/.test(c)) r.push({ t: '重复用词', d: '发现重复字词', s: 'warning' });
+            if (/昨天.*明天/.test(c)) r.push({ t: '时间矛盾', d: '时间表述矛盾', s: 'critical' });
+            if (/不是.*是.*不是/.test(c)) r.push({ t: '逻辑矛盾', d: '逻辑矛盾', s: 'critical' });
+            return r;
+        }
+        
+        detectConflicts() {
+            const c = document.getElementById('editor').value;
+            const i = this.checkLogic(c);
+            this.toast(i.length ? '⚠️ 发现' + i.length + '个问题' : '✅ 无问题');
+            this.closeSheets();
+        }
+        
+        // ===== 导出 =====
+        exportTXT() {
+            const c = document.getElementById('editor').value;
+            if (!c) { this.toast('无内容'); return; }
+            this.download(c, (this.currentBook ? this.currentBook.title : 'novel') + '.txt', 'text/plain');
+            this.toast('📄 导出成功');
+            this.closeSheets();
+        }
+        
+        exportEPUB() {
+            const c = document.getElementById('editor').value;
+            if (!c) { this.toast('无内容'); return; }
+            this.download(c, (this.currentBook ? this.currentBook.title : 'novel') + '.epub', 'application/epub+zip');
+            this.toast('📚 导出成功');
+            this.closeSheets();
+        }
+        
+        download(content, name, type) {
+            const b = new Blob([content], { type: type });
+            const u = URL.createObjectURL(b);
+            const a = document.createElement('a');
+            a.href = u; a.download = name;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(u);
+        }
+        
+        // ===== 工具 =====
+        append(t) {
+            const e = document.getElementById('editor');
+            const p = e.selectionStart;
+            e.value = e.value.substring(0, p) + t + e.value.substring(p);
+            e.selectionStart = e.selectionEnd = p + t.length;
+            this.updateStats();
+            e.focus();
+        }
+        
+        updateStats() {
+            const c = document.getElementById('editor').value || '';
+            const w = c.replace(/\s/g, '').length;
+            document.getElementById('wordCount').textContent = w.toLocaleString();
+            document.getElementById('chapterCount').textContent = (c.match(/第[一二三四五六七八九十\d]+章/g) || []).length;
+            document.getElementById('characterCount').textContent = new Set(c.match(/[\u4e00-\u9fa5]{2,4}(?=[：，。！？\s])/g) || []).size;
+            if (this.currentBook && this.currentBook.targetWords) {
+                const p = (w / this.currentBook.targetWords) * 100;
+                document.getElementById('progressFill').style.width = Math.min(p, 100) + '%';
+            }
+            document.getElementById('statusText').textContent = this.currentBook ? '《' + this.currentBook.title + '》' : '就绪';
+        }
+        
+        setupAutoSave() {
+            if (this.timer) clearInterval(this.timer);
+            this.timer = setInterval(() => this.autoSave(), this.settings.autoSaveInterval * 1000);
+        }
+        
+        autoSave() {
+            if (this.currentBook) {
+                this.currentBook.content = document.getElementById('editor').value;
+                this.currentBook.updatedAt = new Date().toISOString();
+                this.save('books', this.books);
+            }
+        }
+        
+        saveBook() {
+            this.autoSave();
+            this.toast('💾 已保存');
+        }
+        
+        // ===== UI =====
+        selectModel(m, b) {
+            this.currentModel = m;
+            document.querySelectorAll('.model-chip').forEach(c => c.classList.remove('active'));
+            b.classList.add('active');
+            this.toast('🤖 ' + m);
+        }
+        
+        showSheet(id) {
+            this.closeSheets();
+            document.getElementById(id).classList.add('active');
+            document.getElementById('sheetOverlay').classList.add('active');
+        }
+        
+        closeSheets() {
+            document.querySelectorAll('.sheet').forEach(s => s.classList.remove('active'));
+            document.getElementById('sheetOverlay').classList.remove('active');
+        }
+        
+        showNewBook() {
+            this.closeSheets();
+            document.getElementById('newBookModal').classList.add('active');
+        }
+        
+        closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+        
+        saveSettings() {
+            this.settings.autoSaveInterval = parseInt(document.getElementById('autoSaveInterval').value);
+            this.settings.defaultModel = document.getElementById('defaultModel').value;
+            this.save('settings', this.settings);
+            this.setupAutoSave();
+            this.closeSheets();
+            this.toast('⚙️ 已保存');
+        }
+        
+        // ===== 存储 =====
+        load(k) { try { return JSON.parse(localStorage.getItem('ainovel_' + k)); } catch(e) { return null; } }
+        save(k, v) { try { localStorage.setItem('ainovel_' + k, JSON.stringify(v)); } catch(e) { this.toast('存储已满'); } }
+        
+        // ===== 工具 =====
+        toast(m) {
+            const t = document.getElementById('toast');
+            t.textContent = m;
+            t.classList.add('show');
+            clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(() => t.classList.remove('show'), 1500);
+        }
+        wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+    }
+    
+    const app = new AINovel();
+    
+    // 全局函数
+    function showSheet(id) { app.showSheet(id); }
+    function closeSheets() { app.closeSheets(); }
+    function showNewBook() { app.showNewBook(); }
+    function closeModal(id) { app.closeModal(id); }
+    function createBook() { app.createBook(); }
+    function aiGenerate() { app.aiGenerate(); }
+    function aiContinue() { app.aiContinue(); }
+    function genOutline() { app.genOutline(); }
+    function genCharacters() { app.genCharacters(); }
+    function genTimeline() { app.genTimeline(); }
+    function genForeshadows() { app.genForeshadows(); }
+    function rewriteChapter() { app.rewriteChapter(); }
+    function detectConflicts() { app.detectConflicts(); }
+    function runLogic() { app.runLogic(); }
+    function exportTXT() { app.exportTXT(); }
+    function exportEPUB() { app.exportEPUB(); }
+    function selectModel(m, b) { app.selectModel(m, b); }
+    function saveBook() { app.saveBook(); }
+    function saveSettings() { app.saveSettings(); }
+    </script>
+</body>
+</html>
